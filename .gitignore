@@ -1,26 +1,20 @@
-# ===============================
-#  TM-Landscape Git Ignore File
-# ===============================
+# Models and data (downloaded separately)
+models/Rostlab/
+models/TM-vec/
 
-# --- Local data directories (do not upload) ---
-data/
-models/
+# Allow download scripts
+!models/download_*.sh
+
+# Run outputs
 runs/
 
-# Allow zipped versions to be tracked
-!data.zip
-!models.zip
-
-# --- Python cache ---
+# Python cache
 __pycache__/
 *.pyc
 
-# --- Jupyter Notebooks ---
+# Notebooks checkpoints
 .ipynb_checkpoints/
 
-# --- Editors ---
-.vscode/
-
-# --- OS junk ---
+# OS junk
 .DS_Store
-Thumbs.db
+
