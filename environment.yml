@@ -1,0 +1,24 @@
+name: tmls
+channels:
+  - pytorch=2.8.0
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  # --- PyTorch core (auto-detects GPU if available) ---
+  - pytorch
+  - torchvision
+  - torchaudio
+  # --- FAISS (CPU by default; GPU can be swapped later) ---
+  - faiss-cpu
+  - pip:
+      - git+https://github.com/tymor22/tm-vec.git
+      - transformers
+      - sentencepiece
+      - scikit-learn
+      - seaborn
+      - matplotlib
+      - plotly
+      - pandas
+      - tqdm
+
