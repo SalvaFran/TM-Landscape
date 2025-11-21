@@ -65,30 +65,50 @@ conda activate tmls
 
 ---
 
-## 4. Download Required Models
+## 4. Install ProtT5 (Zenodo, automatic) and TM-Vec embeddings (Zenodo, automatic)
+
+ProtT5 and TM-Vec embeddings are public and **downloaded automatically** with:
 
 ```bash
 bash models/download_all.sh
 ```
 
-This downloads:
-
-### ProtT5 (Rostlab)
-```
-models/Rostlab/prot_t5_xl_uniref50/
-```
-
-### TM-Vec CATH database and model
-```
-models/TM-vec/tm_vec_cath_model_large.ckpt
-models/TM-vec/tm_vec_cath_model_large_params.json
-models/TM-vec/cath_large.npy
-models/TM-vec/cath_large_metadata.npy
-```
-
-All scripts automatically read these paths.
+If any file is already installed locally, the script will detect and skip it.
 
 ---
+
+## 5. Install TM-Vec CATH Model (Manual Download Required)
+
+The TM-Vec CATH model is only available from a **private Figshare link**, which cannot be downloaded automatically.
+
+### Step 1 — Open the private link
+
+```
+https://figshare.com/s/e414d6a52fd471d86d69
+```
+
+### Step 2 — Download the required files
+
+Required:
+
+- `tm_vec_cath_model_large.ckpt`
+- `(optional) tm_vec_cath_model_large_params.json`
+
+
+### Step 3 — Place files into the correct directory
+
+Move all downloaded files into:
+
+```
+models/TM-vec/
+```
+
+Example:
+
+```bash
+mv ~/Downloads/tm_vec_cath_model_large.ckpt TM-Landscape/models/TM-vec/
+mv ~/Downloads/tm_vec_cath_model_large_params.json TM-Landscape/models/TM-vec/
+```
 
 ## 5. Running the Main Pipeline
 
