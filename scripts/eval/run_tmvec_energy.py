@@ -257,6 +257,16 @@ def compute_umap_embeddings(Z_ref, Z_ref_2D, umap_model, query_embeddings, df_va
 # Smooth energy KDE
 # ============================================================
 
+PALETTE = {
+    "WT": "#1f77b4",        # blue
+    "masked": "#ff7f0e",    # orange
+    "ala": "#2ca02c",       # green
+    "mix": "#9467bd",       # violet
+    "del": "#8c564b",       # maroon
+    "neighbor": "#111111",  # black
+    "background": "#d3d3d3" # gray
+}
+
 def smooth_energy_field(x, y, E, x_min, x_max, y_min, y_max, grid_res=80, bw=0.25):
     xi = np.linspace(x_min, x_max, grid_res)
     yi = np.linspace(y_min, y_max, grid_res)
