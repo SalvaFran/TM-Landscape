@@ -1,10 +1,12 @@
 name: tmls
 channels:
   - pytorch
+  - nvidia
   - conda-forge
   - defaults
 
 dependencies:
+  # Core
   - python=3.9
   - numpy
   - scipy
@@ -12,17 +14,22 @@ dependencies:
   - matplotlib
   - seaborn
   - scikit-learn
-  - umap-learn
   - tqdm
   - plotly
-  - cupy-cuda12x
-  - numba
-  - pynndescent
+  - umap-learn              # CPU UMAP (we rely on this)
+  - numba                   # speeds up UMAP-learn significantly
+
+  # GPU stack (CUDA 12.x)
   - pytorch=2.2
   - torchvision
   - torchaudio
-  - faiss-cpu
+  - pytorch-cuda=12.1       # matches your CUDA driver (560.xx)
+  - cupy-cuda12x            # GPU backend you successfully tested
+
+  # Other scientific tools
+  - faiss-cpu               # GPU version is unstable on CUDA 12.x
   - sentencepiece
+
   - pip
   - pip:
       - git+https://github.com/tymor22/tm-vec.git
