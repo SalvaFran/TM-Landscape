@@ -20,8 +20,10 @@ dependencies:
   - umap-learn
   - numba
 
-  # GPU stack (CUDA 12.1)
-  - pytorch=2.2
+    # GPU stack (CUDA 12.1)
+  - pytorch=2.3
+  - torchvision=0.18
+  - torchaudio=2.3
   - pytorch-cuda=12.1
 
   # Other scientific tools

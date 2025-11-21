@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-generate_umap_cpu.py
+generate_umap.py
 --------------------
 
 Generate a global 2D UMAP manifold for TM-Vec reference embeddings using
