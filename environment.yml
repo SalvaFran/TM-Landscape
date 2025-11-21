@@ -23,7 +23,6 @@ dependencies:
   # GPU stack (CUDA 12.1)
   - pytorch=2.2
   - pytorch-cuda=12.1
-  - cupy-cuda12x
 
   # Other scientific tools
   - faiss-cpu
@@ -32,7 +31,7 @@ dependencies:
   # Pip packages
   - pip
   - pip:
+      - cupy-cuda12x
       - git+https://github.com/tymor22/tm-vec.git
-      - transformers==4.42.4
+      - transformers>=4.42
       - tokenizers
-      - protobuf<5
