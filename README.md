@@ -1,13 +1,16 @@
+
 # TM-Landscape
-TM-Landscape is a framework for exploring protein sequence–structure manifolds using TM-Vec embeddings.  
+
+TM-Landscape is a framework for exploring protein sequence–structure manifolds using **TM-Vec embeddings**.
+
 It provides tools to:
 
 - Generate local manifolds of sequence variants (masking, alanine scan, mixed perturbations, deletions).
 - Map variants onto a global reference manifold (CATH or SWISS embeddings).
-- Generate global UMAP embeddings of the reference space.
-- Produce full energy landscapes and nearest-neighbor analyses.
+- Train and store a **global 2D UMAP manifold** of the TM-Vec reference space.
+- Produce full free‑energy–like landscapes and nearest‑neighbor analyses.
 
-This repository is designed for reproducible research pipelines based on **TM-Vec** and **ProtT5**, with all large models downloaded on demand.
+This repository is designed for reproducible and scalable research pipelines based on **TM‑Vec**, **ProtT5**, and **UMAP**.
 
 ---
 
@@ -17,7 +20,7 @@ This repository is designed for reproducible research pipelines based on **TM-Ve
 TM-Landscape/
 │
 ├── data/
-│   └── UMAP/                  # Stored UMAP projections (generated locally)
+│   └── UMAP/                  # Global UMAP results (generated locally)
 │
 ├── models/
 │   ├── download_protT5.sh     # Download ProtT5 encoder
@@ -34,20 +37,20 @@ TM-Landscape/
 │       ├── sample_tmvec_embeddings.py
 │       ├── density_estimator.py
 │       ├── frequency_estimator.py
-│       ├── map_tmvec_embeddings.py
 │       └── ...
 │
 ├── environment.yml
+├── umap_environment.yml
 └── README.md
 ```
 
-Large model files (ProtT5, TM-Vec checkpoints, and CATH embeddings) are **not** tracked in git and are downloaded locally via scripts.
+Large checkpoint files (ProtT5, TM‑Vec, and CATH embeddings) are **not included in the Git repo**.
 
 ---
 
 ## 2. Installation
 
-### 2.1. Clone the repository
+### 2.1. Clone the Repository
 
 ```bash
 git clone https://github.com/SalvaFran/TM-Landscape.git
@@ -56,106 +59,120 @@ cd TM-Landscape
 
 ---
 
-## 3. Create the Conda Environment
+## 3. Main Conda Environment (CPU / Neutral)
 
 ```bash
 conda env create -f environment.yml
 conda activate tmls
 ```
 
+This environment supports:
+
+- TM‑Vec
+- ProtT5
+- Variant generation
+- Density & frequency estimators
+- Plotting & analysis
+- **CPU UMAP**
+
+GPU UMAP **is not included** in this environment.
+
 ---
 
-## 4. Install ProtT5 (Zenodo, automatic) and TM-Vec embeddings (Zenodo, automatic)
+## 4. Optional: GPU‑Accelerated UMAP Environment
 
-ProtT5 and TM-Vec embeddings are public and **downloaded automatically** with:
+A dedicated environment is required because RAPIDS/cuML conflicts with PyTorch 2.2 and Python 3.9.
+
+To enable GPU UMAP:
+
+```bash
+conda env create -f umap_environment.yml
+conda activate umap_gpu
+```
+
+Then run UMAP generation using this env:
+
+```bash
+python scripts/eval/generate_umap.py --source cath --size large --n_components 2
+```
+
+This produces:
+
+```
+data/UMAP/Z_UMAP_2D.npy
+data/UMAP/umap_model_2D.pkl
+data/UMAP/umap_limits_2D.json
+```
+
+---
+
+## 5. Install ProtT5 and TM‑Vec Embeddings and Models
+
+### 5.1 Automatic downloads (public)
 
 ```bash
 bash models/download_all.sh
 ```
 
-If any file is already installed locally, the script will detect and skip it.
+### 5.2 Manual download (private CATH TM‑Vec model)
 
----
-
-## 5. Install TM-Vec CATH Model (Manual Download Required)
-
-The TM-Vec CATH model is only available from a **private Figshare link**, which cannot be downloaded automatically.
-
-### Step 1 — Open the private link
+Open the private Figshare link:
 
 ```
 https://figshare.com/s/e414d6a52fd471d86d69
 ```
 
-### Step 2 — Download the required files
-
-Required:
+Download:
 
 - `tm_vec_cath_model_large.ckpt`
-- `(optional) tm_vec_cath_model_large_params.json`
+- (optional) `tm_vec_cath_model_large_params.json`
 
-
-### Step 3 — Place files into the correct directory
-
-Move all downloaded files into:
+Place them in:
 
 ```
 models/TM-vec/
 ```
 
-Example:
+---
 
-```bash
-mv ~/Downloads/tm_vec_cath_model_large.ckpt TM-Landscape/models/TM-vec/
-mv ~/Downloads/tm_vec_cath_model_large_params.json TM-Landscape/models/TM-vec/
-```
-
-## 5. Running the Main Pipeline
+## 6. Running the Main TM‑Landscape Pipeline
 
 Example:
 
 ```bash
-python scripts/eval/run_tmvec_energy.py     --sequence "MLSDADFKAAVGMTRSAFANLPLWKQQNLKKEKGLF"     --frac_min 0.05     --frac_max 0.10     --n_mask 60     --n_ala 40     --n_mix 40     --n_del 20     --source cath     --size large     --outdir Example_Run
+python scripts/eval/run_tmvec_energy.py     --sequence "MLSDADFKAAVGMTRSAFANLPLWKQQNLKKEKGLF"     --frac_min 0.05 --frac_max 0.10     --n_mask 60 --n_ala 40 --n_mix 40 --n_del 20     --source cath --size large     --outdir Example_Run
 ```
 
-Outputs:
+Output folder:
 
 ```
 runs/Example_Run/
     data/
     figs/
+    energy_landscape_3d.html
 ```
+
+All plots use **global 2D UMAP axes**, so runs are directly comparable.
 
 ---
 
-## 6. Global UMAP Generation
+## 7. Generating a Global UMAP Manifold
+
+Before using the main pipeline, generate the UMAP reference:
 
 ```bash
 python scripts/eval/generate_umap.py     --source cath     --size large     --n_components 2
 ```
 
-Outputs saved in:
+### GPU Mode
+Works automatically if CuPy is installed.
 
-```
-data/UMAP/
-```
+### CPU Fallback
+Occurs automatically when CuPy is not available.
 
----
+## License
 
-## 7. Troubleshooting
-
-### CUDA/cuML not available
-On macOS this is expected. The script falls back to CPU UMAP.
-
-### Missing embedding files
-Run:
-
-```bash
-bash models/download_all.sh
-```
+MIT License © 2025 Franco Salvatore
 
 ---
 
-## 8. License
-
-MIT License.
