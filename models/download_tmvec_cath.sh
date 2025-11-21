@@ -10,31 +10,7 @@ mkdir -p "$BASE"
 cd "$BASE"
 
 ########################################
-# 1. TM-Vec CATH LARGE model (Figshare)
-########################################
-echo "[INFO] Checking TM-Vec CATH LARGE MODEL (Figshare private links)"
-
-# CKPT
-if [ ! -f "tm_vec_cath_model_large.ckpt" ]; then
-    echo "[INFO] Downloading tm_vec_cath_model_large.ckpt ..."
-    wget -O tm_vec_cath_model_large.ckpt \
-    "https://figshare.com/ndownloader/files/49181521?private_link=e414d6a52fd471d86d69"
-else
-    echo "[OK] tm_vec_cath_model_large.ckpt already exists → skipping."
-fi
-
-# PARAMS
-if [ ! -f "tm_vec_cath_model_large_params.json" ]; then
-    echo "[INFO] Downloading tm_vec_cath_model_large_params.json ..."
-    wget -O tm_vec_cath_model_large_params.json \
-    "https://figshare.com/ndownloader/files/49181518?private_link=e414d6a52fd471d86d69"
-else
-    echo "[OK] tm_vec_cath_model_large_params.json already exists → skipping."
-fi
-
-
-########################################
-# 2. TM-Vec CATH embeddings (Zenodo)
+# TM-Vec CATH embeddings (Zenodo)
 ########################################
 echo "[INFO] Checking TM-Vec CATH embeddings (Zenodo)"
 
@@ -59,6 +35,6 @@ done
 # Done
 ########################################
 echo "======================================"
-echo "  All CATH model + embeddings ready!  "
+echo "  CATH embeddings ready!  "
 echo "  Location: $BASE"
 echo "======================================"
