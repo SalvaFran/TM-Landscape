@@ -79,42 +79,15 @@ GPU UMAP **is not included** in this environment.
 
 ---
 
-## 4. Optional: GPU‑Accelerated UMAP Environment
+## 4. Install ProtT5 and TM‑Vec Embeddings and Models
 
-A dedicated environment is required because RAPIDS/cuML conflicts with PyTorch 2.2 and Python 3.9.
-
-To enable GPU UMAP:
-
-```bash
-conda env create -f umap_environment.yml
-conda activate umap_gpu
-```
-
-Then run UMAP generation using this env:
-
-```bash
-python scripts/eval/generate_umap.py --source cath --size large --n_components 2
-```
-
-This produces:
-
-```
-data/UMAP/Z_UMAP_2D.npy
-data/UMAP/umap_model_2D.pkl
-data/UMAP/umap_limits_2D.json
-```
-
----
-
-## 5. Install ProtT5 and TM‑Vec Embeddings and Models
-
-### 5.1 Automatic downloads (public)
+### 4.1 Automatic downloads (public)
 
 ```bash
 bash models/download_all.sh
 ```
 
-### 5.2 Manual download (private CATH TM‑Vec model)
+### 4.2 Manual download (private CATH TM‑Vec model)
 
 Open the private Figshare link:
 
@@ -135,7 +108,7 @@ models/TM-vec/
 
 ---
 
-## 6. Running the Main TM‑Landscape Pipeline
+## 5. Running the Main TM‑Landscape Pipeline
 
 Example:
 
@@ -155,20 +128,6 @@ runs/Example_Run/
 All plots use **global 2D UMAP axes**, so runs are directly comparable.
 
 ---
-
-## 7. Generating a Global UMAP Manifold
-
-Before using the main pipeline, generate the UMAP reference:
-
-```bash
-python scripts/eval/generate_umap.py     --source cath     --size large     --n_components 2
-```
-
-### GPU Mode
-Works automatically if CuPy is installed.
-
-### CPU Fallback
-Occurs automatically when CuPy is not available.
 
 ## License
 

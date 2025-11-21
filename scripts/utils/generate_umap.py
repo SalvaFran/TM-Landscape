@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-generate_umap_gpu.py
+generate_umap_cpu.py
 --------------------
 
-Generate a global 2D UMAP manifold for TM-Vec reference embeddings using RAPIDS cuML.
+Generate a global 2D UMAP manifold for TM-Vec reference embeddings using
+pure CPU UMAP (umap-learn). This avoids RAPIDS/cuML pickling issues.
 
 Usage:
-    CUDA_VISIBLE_DEVICES=2 python generate_umap_gpu.py --source cath --size large
+    python generate_umap_cpu.py --source cath --size large
 
 Outputs:
     data/UMAP/Z_UMAP_2D.npy
@@ -16,16 +17,16 @@ Outputs:
     data/UMAP/umap_limits_2D.json
 """
 
-import argparse 
+import argparse
 import sys
 from pathlib import Path
 import numpy as np
 import json
 import pickle
 
-from cuml.manifold import UMAP as UMAP_GPU
-import cupy as cp
+from umap import UMAP  # CPU implementation
 
+# TM-Landscape root
 THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = THIS_FILE.parents[2]
 sys.path.append(str(PROJECT_ROOT))
@@ -34,7 +35,7 @@ from scripts.utils.load_tmvec_embeddings import load_tmvec_embeddings
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Generate global 2D GPU-UMAP for TM-Vec embeddings.")
+    parser = argparse.ArgumentParser(description="Generate global 2D CPU-UMAP for TM-Vec embeddings.")
     parser.add_argument("--source", choices=["cath", "swiss"], required=True)
     parser.add_argument("--size", choices=["small", "large"], required=True)
     parser.add_argument("--n_neighbors", type=int, default=30)
@@ -56,38 +57,40 @@ def main():
     out_model = umap_dir / "umap_model_2D.pkl"
     out_limits = umap_dir / "umap_limits_2D.json"
 
-    print("[INFO] Moving embeddings to GPU...")
-    Z_gpu = cp.asarray(Z_ref)
+    print("[INFO] Running CPU UMAP (umap-learn)...")
 
-    print("[INFO] Running GPU UMAP...")
-    umap_model = UMAP_GPU(
+    umap_model = UMAP(
         n_components=2,
         n_neighbors=args.n_neighbors,
         min_dist=args.min_dist,
         metric="cosine",
         random_state=42,
+        low_memory=False,        # faster
         verbose=True
     )
 
-    Z_umap_gpu = umap_model.fit_transform(Z_gpu)
-    Z_umap = cp.asnumpy(Z_umap_gpu)
+    Z_umap = umap_model.fit_transform(Z_ref)
 
+    # Save embedding
     print(f"[INFO] Saving embedding → {out_embed}")
     np.save(out_embed, Z_umap)
 
+    # Save model (CPU pickle — safe)
     print(f"[INFO] Saving model → {out_model}")
-    pickle.dump(umap_model, open(out_model, "wb"))
+    with open(out_model, "wb") as f:
+        pickle.dump(umap_model, f)
 
-    print("[INFO] Saving UMAP limits...")
+    # Save limits
     limits = {
         "xmin": float(Z_umap[:, 0].min()),
         "xmax": float(Z_umap[:, 0].max()),
         "ymin": float(Z_umap[:, 1].min()),
         "ymax": float(Z_umap[:, 1].max()),
     }
+    print("[INFO] Saving 2D limits...")
     json.dump(limits, open(out_limits, "w"), indent=4)
 
-    print("\n[FINISHED] Global GPU UMAP created successfully!")
+    print("\n[FINISHED] Global CPU UMAP created successfully!")
 
 
 if __name__ == "__main__":

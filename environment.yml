@@ -33,5 +33,6 @@ dependencies:
   - pip
   - pip:
       - git+https://github.com/tymor22/tm-vec.git
-      - transformers>=4.42
+      - transformers==4.42.4
       - tokenizers
+      - protobuf<5
