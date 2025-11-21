@@ -21,10 +21,10 @@ dependencies:
   - numba
 
     # GPU stack (CUDA 12.1)
-  - pytorch=2.3
-  - torchvision=0.18
-  - torchaudio=2.3
-  - pytorch-cuda=12.1
+  - pytorch=2.6.0
+  #- torchvision=0.18
+  #- torchaudio=2.3
+  #- pytorch-cuda=12.1
 
   # Other scientific tools
   - faiss-cpu
@@ -33,7 +33,7 @@ dependencies:
   # Pip packages
   - pip
   - pip:
-      - cupy-cuda12x
+      #- cupy-cuda12x
       - git+https://github.com/tymor22/tm-vec.git
       - transformers>=4.42
       - tokenizers

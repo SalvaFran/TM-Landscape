@@ -11,7 +11,7 @@ Uses a GLOBAL 2D UMAP manifold (CPU version):
     data/UMAP/Z_UMAP_2D.npy
     data/UMAP/umap_model_2D.pkl
 
-UMAP must be generated first using: generate_umap_cpu.py
+UMAP must be generated first using: generate_umap.py (CPU only)
 """
 
 import argparse
