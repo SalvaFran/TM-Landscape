@@ -14,6 +14,12 @@ Usage example:
         --n_mask 60 --n_ala 40 --n_mix 40 --n_del 20 \
         --source cath --size large \
         --outdir 1VII_test01
+
+This version uses a GLOBAL 2D UMAP manifold:
+    data/UMAP/Z_UMAP_2D.npy
+    data/UMAP/umap_model_2D.pkl
+
+UMAP for Z_ref must be generated beforehand with your generate_umap.py script.
 """
 
 import argparse
@@ -24,11 +30,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.neighbors import NearestNeighbors
-from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_distances
 from tqdm.auto import tqdm
 from scipy.stats import gaussian_kde
 import plotly.graph_objects as go
+import pickle
+
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
 
 # Import project modules
 THIS_FILE = Path(__file__).resolve()
@@ -46,7 +55,7 @@ from scripts.utils.frequency_estimator import estimate_log_frequency
 # ============================================================
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="TM-Vec manifold energy landscape demo.")
+    parser = argparse.ArgumentParser(description="TM-Vec manifold energy landscape demo (UMAP-based).")
     parser.add_argument("--sequence", type=str, required=True)
     parser.add_argument("--frac_min", type=float, required=True)
     parser.add_argument("--frac_max", type=float, required=True)
@@ -112,7 +121,6 @@ def generate_variant_embeddings(seq, n_mask, n_ala, n_mix, n_del,
         frac_del_range=(frac_min, frac_max),
     )
 
-    # ================= FIX: leer bien categorías ===================
     variant_seqs = {
         "WT": [seq],
         "masked": [s for s, _ in results["masked"]],
@@ -128,7 +136,7 @@ def generate_variant_embeddings(seq, n_mask, n_ala, n_mix, n_del,
         masked=np.array([e for _, e in results["masked"]]),
         ala=np.array([e for _, e in results["ala"]]),
         mix=np.array([e for _, e in results["mix"]]),
-        dele=np.array([e for _, e in results["del"]])   # FIX: así se guardó en sample_and_save
+        dele=np.array([e for _, e in results["del"]])
     )
 
     print(f"[INFO] Saved embeddings → {npz_final}")
@@ -147,8 +155,6 @@ def build_variants_df(embeddings_npz, Z_ref, metadata, source_label, k_density=2
     Z_masked = data["masked"]
     Z_ala = data["ala"]
     Z_mix = data["mix"]
-
-    # =============== FIX: leer correctamente deletions ===============
     Z_del = data["dele"]
 
     variant_sets = {
@@ -231,35 +237,62 @@ def save_variant_fasta(variant_seqs, outdir):
 
 
 # ============================================================
-# Dimensionality reduction
+# UMAP projection (replaces t-SNE)
 # ============================================================
 
-def compute_tsne_embeddings(Z_ref, query_embeddings, df_variants, random_state=42):
+def compute_umap_embeddings(Z_ref, Z_ref_2D, umap_model, query_embeddings, df_variants,
+                            umap_xmin, umap_xmax, umap_ymin, umap_ymax,
+                            n_bg=2000, random_state=42):
+    """
+    Build a 2D dataframe similar to the old t-SNE one, but using a global UMAP:
+    - background: random subset of Z_ref_2D
+    - neighbor: Nearest_Index coordinates in Z_ref_2D
+    - variants: UMAP transform of query_embeddings
+    """
+    print("Projecting embeddings into 2D UMAP space...")
 
-    print("Running 2D t-SNE...")
-
-    n_bg = min(2000, Z_ref.shape[0])
     rng = np.random.default_rng(random_state)
+    n_bg = min(n_bg, Z_ref.shape[0])
     bg_idx = rng.choice(Z_ref.shape[0], size=n_bg, replace=False)
-    Z_bg = Z_ref[bg_idx]
+
+    Z_bg_2D = Z_ref_2D[bg_idx]
 
     nn_idx = df_variants["Nearest_Index"].unique()
-    Z_nn = Z_ref[nn_idx]
+    Z_nn_2D = Z_ref_2D[nn_idx]
 
-    Z_all = np.vstack([Z_bg, Z_nn, query_embeddings])
-    labels = (
-        ["background"] * len(Z_bg)
-        + ["neighbor"] * len(Z_nn)
-        + df_variants["Variant_Type"].tolist()
-    )
+    # UMAP transform for query embeddings
+    coords_query = umap_model.transform(query_embeddings)
 
-    tsne2 = TSNE(n_components=2, perplexity=30, metric="cosine", random_state=random_state)
-    coords = tsne2.fit_transform(Z_all)
+    # Build combined dataframe, preserving order so that the last len(df_variants)
+    # rows correspond to variants in the same order as df_variants
+    rows = []
 
-    df_tsne = pd.DataFrame({"TSNE1": coords[:, 0], "TSNE2": coords[:, 1], "Label": labels})
+    # background
+    for i in range(Z_bg_2D.shape[0]):
+        rows.append({
+            "UMAP1": Z_bg_2D[i, 0],
+            "UMAP2": Z_bg_2D[i, 1],
+            "Label": "background"
+        })
 
-    # FIX: t-SNE NO produce reaction coordinate → devolvemos None
-    return None, df_tsne
+    # neighbors
+    for i in range(Z_nn_2D.shape[0]):
+        rows.append({
+            "UMAP1": Z_nn_2D[i, 0],
+            "UMAP2": Z_nn_2D[i, 1],
+            "Label": "neighbor"
+        })
+
+    # variants (in same order as df_variants)
+    for i, vtype in enumerate(df_variants["Variant_Type"].tolist()):
+        rows.append({
+            "UMAP1": coords_query[i, 0],
+            "UMAP2": coords_query[i, 1],
+            "Label": vtype
+        })
+
+    df_umap = pd.DataFrame(rows)
+    return df_umap
 
 
 # ============================================================
@@ -278,12 +311,12 @@ PALETTE = {
 
 
 # ============================================================
-# Smooth energy KDE
+# Smooth energy KDE (now with fixed global UMAP limits)
 # ============================================================
 
-def smooth_energy_field(x, y, E, grid_res=80, bw=0.25):
-    xi = np.linspace(x.min(), x.max(), grid_res)
-    yi = np.linspace(y.min(), y.max(), grid_res)
+def smooth_energy_field(x, y, E, x_min, x_max, y_min, y_max, grid_res=80, bw=0.25):
+    xi = np.linspace(x_min, x_max, grid_res)
+    yi = np.linspace(y_min, y_max, grid_res)
     xi, yi = np.meshgrid(xi, yi)
 
     weights = np.exp(-E)
@@ -304,26 +337,29 @@ def smooth_energy_field(x, y, E, grid_res=80, bw=0.25):
 # Plotting
 # ============================================================
 
-def plot_all(df, df_tsne, figs_dir):
+def plot_all(df, df_umap, figs_dir, umap_xmin, umap_xmax, umap_ymin, umap_ymax):
 
     figs_dir.mkdir(parents=True, exist_ok=True)
 
-    # t-SNE 2D
+    # 2D UMAP scatter (replacing t-SNE)
     plt.figure(figsize=(7, 6))
     ax = plt.gca()
-    for label, sub in df_tsne.groupby("Label"):
+    for label, sub in df_umap.groupby("Label"):
         color = PALETTE.get(label, "#cccccc")
         alpha = 0.25 if label == "background" else 0.7
         size = 10 if label == "background" else 20
-        ax.scatter(sub["TSNE1"], sub["TSNE2"], s=size, alpha=alpha, color=color, label=label)
+        ax.scatter(sub["UMAP1"], sub["UMAP2"], s=size, alpha=alpha, color=color, label=label)
+    plt.xlim(umap_xmin, umap_xmax)
+    plt.ylim(umap_ymin, umap_ymax)
     plt.legend()
-    plt.savefig(figs_dir / "tsne_2d_variants.png", dpi=300)
+    plt.savefig(figs_dir / "umap_2d_variants.png", dpi=300)
     plt.close()
 
     # TM-score hist
     plt.figure(figsize=(6, 4))
     sns.histplot(df, x="Approx_TM_NN", hue="Variant_Type",
                  element="step", stat="density", common_norm=False, palette=PALETTE)
+    plt.xlim(0, 1)
     plt.savefig(figs_dir / "tm_score_hist.png", dpi=300)
     plt.close()
 
@@ -333,6 +369,7 @@ def plot_all(df, df_tsne, figs_dir):
         data=df[df["Variant_Type"].isin(["masked", "ala", "mix", "del"])],
         x="Variant_Type", y="Cosine_Distance_to_WT", palette=PALETTE
     )
+    plt.ylim(0, 1)
     plt.savefig(figs_dir / "distance_boxplot.png", dpi=300)
     plt.close()
 
@@ -359,31 +396,37 @@ def plot_all(df, df_tsne, figs_dir):
     # TM vs density
     plt.figure(figsize=(6, 4))
     sns.scatterplot(df, x="Approx_TM_NN", y="Log_Density", hue="Variant_Type", palette=PALETTE)
+    plt.xlim(0, 1)
     plt.savefig(figs_dir / "tm_vs_density.png", dpi=300)
     plt.close()
 
-    # 3D energy
-    df_var = df_tsne[df_tsne["Label"].isin(["WT", "masked", "ala", "mix", "del"])].copy()
+    # 3D energy (UMAP-based)
+    df_var = df_umap[df_umap["Label"].isin(["WT", "masked", "ala", "mix", "del"])].copy()
     df_var["Energy"] = df["Energy"].values
-    x3, y3, z3 = df_var["TSNE1"], df_var["TSNE2"], df_var["Energy"]
-    xi, yi, zi = smooth_energy_field(x3, y3, z3)
+    x3, y3, z3 = df_var["UMAP1"], df_var["UMAP2"], df_var["Energy"]
+    xi, yi, zi = smooth_energy_field(x3, y3, z3, umap_xmin, umap_xmax, umap_ymin, umap_ymax)
     fig = go.Figure()
     fig.add_trace(go.Surface(x=xi, y=yi, z=zi, colorscale="Viridis", opacity=0.45))
     for vtype, sub in df_var.groupby("Label"):
         fig.add_trace(go.Scatter3d(
-            x=sub["TSNE1"], y=sub["TSNE2"], z=sub["Energy"],
+            x=sub["UMAP1"], y=sub["UMAP2"], z=sub["Energy"],
             mode="markers",
             marker=dict(size=5, color=PALETTE[vtype]),
             name=vtype,
         ))
     fig.write_html(str(figs_dir / "energy_landscape_3d.html"))
 
-    # 2D FEL
-    X2, Y2, F2 = smooth_energy_field(x3, y3, z3, grid_res=200, bw=0.20)
+    # 2D FEL (UMAP-based)
+    X2, Y2, F2 = smooth_energy_field(x3, y3, z3, umap_xmin, umap_xmax, umap_ymin, umap_ymax,
+                                     grid_res=200, bw=0.20)
     plt.figure(figsize=(8, 7))
-    cs = plt.contourf(X2, Y2, F2, levels=14, cmap="turbo")
+    norm = Normalize(vmin=F2.min(), vmax=F2.max())
+    cs = plt.contourf(X2, Y2, F2, levels=14, cmap="turbo", norm=norm)
     plt.scatter(x3, y3, s=10, c="black", alpha=0.3)
-    plt.colorbar()
+    plt.xlim(umap_xmin, umap_xmax)
+    plt.ylim(umap_ymin, umap_ymax)
+    cbar = plt.colorbar(ScalarMappable(norm=norm, cmap="turbo"))
+    cbar.set_label("Energy")
     plt.savefig(figs_dir / "energy_landscape_2d.png", dpi=300)
     plt.close()
 
@@ -425,15 +468,56 @@ def main():
 
     save_variant_fasta(variant_seqs, run_root)
 
-    print("[4/6] Running t-SNE")
-    rc, df_tsne = compute_tsne_embeddings(Z_ref, query_embeddings, df)
+    # ---------- Load global UMAP 2D ----------
+    umap_dir = PROJECT_ROOT / "data" / "UMAP"
+    z_umap_path = umap_dir / "Z_UMAP_2D.npy"
+    umap_model_path = umap_dir / "umap_model_2D.pkl"
 
-    # FIX: rc es None → no guardamos RC
+    if not z_umap_path.exists() or not umap_model_path.exists():
+        raise FileNotFoundError(
+            f"Global UMAP not found in {umap_dir}. "
+            f"Run generate_umap.py with n_components=2 before using this script."
+        )
+
+    print("[4/6] Loading global UMAP (2D)")
+    Z_ref_2D = np.load(z_umap_path)
+    umap_model = pickle.load(open(umap_model_path, "rb"))
+
+    if Z_ref_2D.shape[0] != Z_ref.shape[0]:
+        raise RuntimeError(
+            f"Z_UMAP_2D.npy has {Z_ref_2D.shape[0]} rows but Z_ref has {Z_ref.shape[0]}. "
+            "They must correspond to the same reference embeddings."
+        )
+
+    # Global limits (with padding) for consistent axes across runs
+    umap_xmin = Z_ref_2D[:, 0].min()
+    umap_xmax = Z_ref_2D[:, 0].max()
+    umap_ymin = Z_ref_2D[:, 1].min()
+    umap_ymax = Z_ref_2D[:, 1].max()
+
+    pad_x = 0.02 * (umap_xmax - umap_xmin)
+    pad_y = 0.02 * (umap_ymax - umap_ymin)
+
+    umap_xmin -= pad_x
+    umap_xmax += pad_x
+    umap_ymin -= pad_y
+    umap_ymax += pad_y
+
+    print(f"[INFO] Global UMAP limits: X=({umap_xmin:.3f}, {umap_xmax:.3f}) "
+          f"Y=({umap_ymin:.3f}, {umap_ymax:.3f})")
+
+    print("[5/6] Building 2D UMAP dataframe")
+    df_umap = compute_umap_embeddings(
+        Z_ref, Z_ref_2D, umap_model, query_embeddings, df,
+        umap_xmin, umap_xmax, umap_ymin, umap_ymax
+    )
+
+    # Reaction coordinate not defined here
     df["Reaction_Coord"] = np.nan
 
-    print("[5/6] Saving data")
+    print("[6/6] Saving data and figures")
     df.to_csv(data_dir / "variants_summary.csv", index=False)
-    df_tsne.to_csv(data_dir / "tsne_2d_variants.csv", index=False)
+    df_umap.to_csv(data_dir / "umap_2d_variants.csv", index=False)
 
     nn_counts = df["Nearest_ID"].value_counts().reset_index()
     nn_counts.columns = ["Nearest_ID", "Count"]
@@ -441,8 +525,7 @@ def main():
 
     pd.Series(vars(args)).to_csv(data_dir / "params.tsv", sep="\t", header=False)
 
-    print("[6/6] Generating figures")
-    plot_all(df, df_tsne, figs_dir)
+    plot_all(df, df_umap, figs_dir, umap_xmin, umap_xmax, umap_ymin, umap_ymax)
 
     print(f"\nRun completed: {run_root}")
 
