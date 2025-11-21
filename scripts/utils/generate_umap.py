@@ -15,9 +15,11 @@ Outputs:
     data/UMAP/umap_model_{nD}.pkl
     data/UMAP/umap_limits_{nD}.json   (only for nD=2)
 
-GPU ACCELERATION:
-    Works automatically if CuPy is installed (cupy-cuda12x).
-    Falls back to CPU if CuPy is missing.
+IMPORTANT:
+    umap-learn CANNOT run on GPU (CuPy arrays not supported by scikit-learn).
+    Therefore, UMAP always runs on CPU.
+
+    If Z_ref is a CuPy array, it will be converted to NumPy explicitly.
 """
 
 import argparse
@@ -27,16 +29,16 @@ import numpy as np
 import json
 import pickle
 
-# Try GPU with CuPy
+# Optional CuPy detection (only for .get() conversion)
 try:
     import cupy as cp
     CUPY_AVAILABLE = True
-    print("[INFO] CuPy found → GPU UMAP available")
+    print("[INFO] CuPy found (GPU arrays may appear, but UMAP will run on CPU).")
 except Exception:
     CUPY_AVAILABLE = False
-    print("[INFO] CuPy NOT found → fallback to CPU UMAP")
+    print("[INFO] CuPy NOT found → everything will run on CPU.")
 
-# CPU UMAP implementation
+# CPU UMAP
 from umap import UMAP as UMAP_CPU
 
 # TM-Landscape root
@@ -62,40 +64,27 @@ def parse_args():
 
 
 # ============================================================
-# UMAP training (GPU via CuPy + umap-learn)
+# CPU-only UMAP training
 # ============================================================
 
 def run_umap(Z_ref, n_components, n_neighbors, min_dist):
 
-    if CUPY_AVAILABLE:
-        print("[UMAP] Using GPU via CuPy backend")
+    print("[UMAP] Running on CPU (umap-learn cannot use GPU).")
 
-        Z_gpu = cp.asarray(Z_ref)
+    # If Z_ref is a CuPy array → convert explicitly
+    if CUPY_AVAILABLE and isinstance(Z_ref, cp.ndarray):
+        print("[UMAP] Converting CuPy → NumPy for CPU UMAP...")
+        Z_ref = cp.asnumpy(Z_ref)
 
-        model = UMAP_CPU(
-            n_components=n_components,
-            n_neighbors=n_neighbors,
-            min_dist=min_dist,
-            metric="cosine",
-            random_state=42,
-            transform_seed=42,
-        )
+    model = UMAP_CPU(
+        n_components=n_components,
+        n_neighbors=n_neighbors,
+        min_dist=min_dist,
+        metric="cosine",
+        random_state=42,
+    )
 
-        # Fit on GPU data (umap-learn automatically dispatches to CuPy)
-        Z_embed_gpu = model.fit_transform(Z_gpu)
-        Z_embed = cp.asnumpy(Z_embed_gpu)
-
-    else:
-        print("[UMAP] Using CPU")
-        model = UMAP_CPU(
-            n_components=n_components,
-            n_neighbors=n_neighbors,
-            min_dist=min_dist,
-            metric="cosine",
-            random_state=42,
-        )
-        Z_embed = model.fit_transform(Z_ref)
-
+    Z_embed = model.fit_transform(Z_ref)
     return model, Z_embed
 
 
@@ -130,7 +119,7 @@ def main():
     print(f"[INFO] Saving UMAP model → {out_model}")
     pickle.dump(model, open(out_model, "wb"))
 
-    # Save limits (only for 2D)
+    # Save 2D limits
     if args.n_components == 2:
         xmin = float(Z_embed[:, 0].min())
         xmax = float(Z_embed[:, 0].max())
