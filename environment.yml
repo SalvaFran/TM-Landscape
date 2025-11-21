@@ -15,6 +15,9 @@ dependencies:
   - umap-learn
   - tqdm
   - plotly
+  - cupy-cuda12x
+  - numba
+  - pynndescent
   - pytorch=2.2
   - torchvision
   - torchaudio
