@@ -5,6 +5,9 @@ models/TM-vec/
 # Allow download scripts
 !models/download_*.sh
 
+# data UMAP
+data/
+
 # Run outputs
 runs/
 

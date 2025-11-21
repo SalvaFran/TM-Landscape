@@ -8,30 +8,30 @@ channels:
 dependencies:
   # Core
   - python=3.9
-  - numpy
+  - numpy>=1.22
   - scipy
   - pandas
   - matplotlib
   - seaborn
+  - requests
   - scikit-learn
   - tqdm
   - plotly
-  - umap-learn              # CPU UMAP (we rely on this)
-  - numba                   # speeds up UMAP-learn significantly
+  - umap-learn
+  - numba
 
-  # GPU stack (CUDA 12.x)
+  # GPU stack (CUDA 12.1)
   - pytorch=2.2
-  - torchvision
-  - torchaudio
-  - pytorch-cuda=12.1       # matches your CUDA driver (560.xx)
-  - cupy-cuda12x            # GPU backend you successfully tested
+  - pytorch-cuda=12.1
+  - cupy-cuda12x
 
   # Other scientific tools
-  - faiss-cpu               # GPU version is unstable on CUDA 12.x
+  - faiss-cpu
   - sentencepiece
 
+  # Pip packages
   - pip
   - pip:
       - git+https://github.com/tymor22/tm-vec.git
-      - transformers>=4.30
+      - transformers>=4.42
       - tokenizers
